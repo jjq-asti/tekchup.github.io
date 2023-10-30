@@ -6,46 +6,463 @@
 
 
 * Tutorials                                                      :@Tutorials:
-** STARTED Testing Network Speed                                  :networks:
+** DONE Testing Network Speed                                  :networks:
 :PROPERTIES:
 :EXPORT_DATE: <2023-04-23 Sun>
-:EXPORT_FILE_NAME: my-first-post
+:EXPORT_FILE_NAME: TCP Throughput Measurement
 :END:
+*** Overview
 We all know how it feels when the network speed is problematic and you constantly get disconnected from the internet.
 
 There are several approach to testing a network depending on the nature of it. Common factors are your ISP's internet speed or you local network.
-*** Testing the Internet Speed
-There are serveral browser based speedtest tools that can be used to check you internet speed.
- The most commonly used is the speedtest.net.
 
+*** Sources
+- [[https://www.rfc-editor.org/rfc/pdfrfc/rfc6349.txt.pdf][RFC 6349]]
+- [[https://sandilands.info/sgordon/impact-of-bandwidth-delay-product-on-tcp-throughput][Impact of BDP on TCP Throughput]]
 
+*** TCP (Transmission Control Protocol)
+TCP is a connection-oriented protocol in the IP family that guarantees that all sent packets will reach the destination in the correct order.
 
-** TODO What you need to know about internet speedtest tools.
+**** TCP Three-Way Handshake
+The TCP connections start with a three-way handshake:
+1. *SYN* :: The client sends a packet with the syn (synchronize) flag set to the server.
+2. *SYN-ACK* :: The server sends a packet with both the SYN and ACK (acknowledge) flags set to the client.
+3. *ACK* :: The client sends a packet with the ACK flag set to the server.
+#+begin_src plantuml :file static/images/three-way-handshake.png :eval no-export
+  skinparam dpi 100
 
-** TODO Convert you PLDT Prepaid Modem into an Access Point.
+  participant "Client" as C
+  participant "Server" as S
 
-** TODO Set up a wifi voucher system using Tplink Omada.
-
-** TODO Django Token Authentication using Durin
-
-** TODO How to use Multipass
-
-** DONE Testing Django Rest API with Pytest
-:PROPERTIES:
-:EXPORT_FILE_NAME: Unittesting-with-drf
-:EXPORT_DATE: <2023-05-14 Sun>
-:END:
-If you are wondering how to use pytest with Django DRF then you are in for some treat.
-Pytest is great for unit testing but when working with DRF some work needs to be done.
-Luckily there is =drf_pytest= to help with structuring the test cases.
-
-*** Project Setup
-We will be using the Django blog project for the tutorial.
-#+begin_src sh
-  django-admin start project blog
+  C -> S: SYNC
+  S -> C: SYNC, ACK
+  C -> S: ACK
 #+end_src
 
-* Articles                                                        :@Articles:
+#+attr_html: :caption three-way-handshake
+#+RESULTS:
+[[file:static/images/three-way-handshake.png]]
+
+**** Data Transmission
+After the connection is established, data is transmitted as packets betweenthe client and server.
+
+#+begin_src plantuml :file images/data-transmission.png :eval no-export
+  skinparam dpi 300
+
+  participant "Client" as C
+  participant "Server" as S
+
+  C -> S: Data Packet 1
+  S --> C: ACK
+  C -> S: Data Packet 2
+  S --> C: ACK
+#+end_src
+#+attr_latex: :height 100
+#+RESULTS:
+[[file:images/data-transmission.png]]
+
+**** Connection Termination
+The connection termination also involves a three-step process:
+1. *FIN*: Either the client or searver sends a packet with the *FIN* (finish) flag set.
+2. *ACK*: The other party sends an *ACK* flag.
+3. *FIN*, *ACK*: Finally the one who sent the *FIN* flag, sends an *ACK* flag again to terminate the connection.
+#+begin_src plantuml :file static/images/connection-termination.png :eval no-export
+  skinparam dpi 100
+
+  participant "Client" as C
+  participant "Server" as S
+
+  C -> S: FIN
+  S --> C: ACK
+  C -> S: FIN, ACK
+#+end_src
+#+attr_latex: :height 100
+#+RESULTS:
+[[file:static/images/connection-termination.png]]
+
+**** TCP Flow Control
+***** Small Receive Buffer
+#+begin_src plantuml :file static/images/tcp_flow_control.png :eval no-export
+  skinparam dpi 100
+  title Advertised Window Size: Small
+
+  participant "Sender" as S
+  participant "Network\nLatency" as N
+  participant "Receiver" as R
+
+  autonumber
+  S -> N: Segment 1
+  activate N
+  N -> R: Segment 1
+  activate R
+  note over S, R: RTT for Segment 1 starts
+
+  R -> N: ACK Segment 1
+  deactivate R
+  N -> S: ACK Segment 1
+  deactivate N
+  note over S, R: RTT for Segment 1 ends
+
+  S -> N: Segment 2
+  activate N
+  N -> R: Segment 2
+  note over S, R: RTT for Segment 2 starts
+
+  R -> N: ACK Segment 2
+  deactivate R
+  N -> S: ACK Segment 2
+  deactivate N
+  note over S, R: RTT for Segment 2 ends
+#+end_src
+
+#+RESULTS:
+[[file:static/images/tcp_flow_control.png]]
+
+***** Large receive Buffer
+#+begin_src plantuml :file static/images/tcp_flow_control_large_buffer.png :eval no-export
+  skinparam dpi 100
+  title Advertised Window Size: Large
+
+  participant "Sender" as S
+  participant "Network\nLatency" as N
+  participant "Receiver" as R
+
+  autonumber
+  S -> N: Segment 1
+  activate N
+  N -> R: Segment 1
+  activate R
+  note over S, R: RTT for Segment 1 starts
+
+  S -> N: Segment 2
+  N -> R: Segment 2
+  note over S, R: RTT for Segment 2 starts
+
+  R -> N: ACK Segment 1
+  deactivate R
+  N -> S: ACK Segment 1
+  deactivate N
+  note over S, R: RTT for Segment 1 ends
+
+  S -> N: Segment 3
+  activate N
+  N -> R: Segment 3
+
+  R -> N: ACK Segment 2
+  deactivate R
+  N -> S: ACK Segment 2
+  deactivate N
+  note over S, R: RTT for Segment 2 ends
+#+end_src
+
+*** TCP Congestion Control
+TCP uses congestion control to avoid sending more data than the network can handle, ensuring network stability and efficiency.
+
+#+BEGIN_SRC plantuml :file images/tcp-congestion-control.png :eval no-export
+  skinparam dpi 300
+
+  state "Slow Start" as A
+  state "Congestion Avoidance" as B
+  state "Fast Recovery" as C
+
+  A --> B : Threshold reached
+  B --> C : Packet loss detected
+  C --> A : Timeout
+#+END_SRC
+#+attr_latex: :height 150
+#+RESULTS:
+[[file:images/tcp-congestion-control.png]]
+
+**** Slow Start
+Slow Start is an algorithm used by TCP to control congestion by initially sending a small number of packets and doubling the number after each round-trip time (RTT).
+
+- After a packet loss is detected and the lost packet is retransmitted, the congestion window size is deflated to the new threshold, which is typically half of the window size at the time of packet loss detection.
+- The protocol then exits Fast Recovery.
+- It does not enter Slow Start again unless there is a timeout, which is considered a more significant indication of congestion, leading to the resetting of the congestion window to 1 MSS.
+#+BEGIN_SRC plantuml :file static/images/tcp-slow-start.png :eval no-export
+    skinparam dpi 100
+
+  start
+  :Enter Slow Start;
+  while (No loss detected and\nthreshold not reached) is (yes)
+    :Double window size\neach RTT;
+  endwhile
+  :Enter Congestion Avoidance;
+  while (No packet loss) is (yes)
+    :Increase window size by\n1 segment each RTT;
+  endwhile
+  :Packet loss detected;
+  :Enter Fast Recovery;
+  :Resend lost packet;
+  :Deflate congestion window size to new threshold (half of the window size when loss detected);
+  if (Acknowledgment for new data received?) then (yes)
+    :Exit Fast Recovery;
+    :Enter Congestion Avoidance with reduced window size;
+  else (no)
+    :Continue in Fast Recovery;
+  endif
+  stop
+#+END_SRC
+
+#+RESULTS:
+[[file:static/images/tcp-slow-start.png]]
+
+
+- Upon entering Fast Recovery, the lost packet is resent.
+- The congestion window size is deflated to a new threshold.
+- If an acknowledgment for new data is received, it exits Fast Recovery and enters the Congestion Avoidance phase with the reduced window size. Otherwise, it continues in Fast Recovery.
+**** How this affects the Netmesh RFC6349 app?
+This application excludes the results from the first 5 seconds of measurement in order to ensure that the transmission is in equilibrium
+*** MTU Discovery
+**** PMTU (Path MTU Discovery)
+PMTU Discovery is used by TCP to avoid IP fragmentation by discovering the maximum transmission unit size on the path between the sender and receiver.
+
+#+BEGIN_SRC plantuml :file static/images/tcp-pmtu.png :eval no-export
+  skinparam dpi 100
+
+  participant "Sender" as A
+  participant "Intermediate\nRouter" as B
+  participant "Receiver" as C
+
+  A -> B: Packet (1500 bytes)
+  B -> A: ICMP Packet\n"Fragmentation Needed"
+  A -> B: Packet (1400 bytes)
+  B -> C: Forwarded Packet\n(1400 bytes)
+#+END_SRC
+
+#+RESULTS:
+[[file:static/images/tcp-pmtu.png]]
+
+
+**** PLPMTU (Packetization Layer Path MTU Discovery)
+A modern technique for discovering the path MTU between two devices on a network.
+It aims to probe larger sizes more aggressively without causing packets to be dropped. It does not rely on the reception of ICMP messages to find the path MTU.
+#+begin_src plantuml :file static/images/plpmtu.png :eval no-export
+  skinparam dpi 100
+
+  participant "Sender" as A
+  participant "Network Path" as B
+  participant "Receiver" as C
+
+  note over A, C: PLPMTU Discovery Start
+
+  A -> B : Send probe packet with size X
+  alt Packet Success
+      B -> A : Acknowledge packet receipt
+      A -> A : Increase packet size, repeat probing
+  else Packet Too Large
+      B -> A : Packet too large error (implicit or explicit)
+      A -> A : Decrease packet size, repeat probing
+  end
+
+  note over A, C: PLPMTU Discovery Complete
+  A -> A: Set MTU to final probed size
+#+end_src
+
+#+RESULTS:
+[[file:static/images/plpmtu.png]]
+
+***** How the netmesh app finds the mtu?
+PLPMTU is used by the Netmesh rfc6349 application to find the path mtu. An opensource project is used to implement this functionality. Here is the link to the github repo: [[https://github.com/Kavarenshko/plp-mtu-discovery][PLPMTU]]
+
+**** Window Scaling
+Window Scaling is a mechanism used in TCP to allow the use of a larger receive window, with a scale factor used to multiply the window size value.
+
+#+BEGIN_SRC plantuml :file static/images/tcp-window-scaling.png :eval no-export
+  skinparam dpi 100
+
+
+  participant "Sender" as A
+  participant "Receiver" as B
+
+  A -> B: SYN, Window Scale Option (4)
+  B -> A: SYN-ACK, Window Scale Option (4)
+  A -> B: ACK
+#+END_SRC
+
+#+RESULTS:
+[[file:static/images/tcp-window-scaling.png]]
+
+
+**** TCP Throughput Measurement
+***** BDP Calculation
+#+begin_example
+  For a 100Mbps link at 10ms delay (rtt)
+  BDP = 100 000 000 * .010 / 8 = 125KBytes
+#+end_example
+***** Linux Receive Buffer
+Check the default buffer sizes in Linux OS
+#+begin_src shell
+  sysctl net.ipv4.tcp_rmem
+#+end_src
+
+#+RESULTS:
+| net.ipv4.tcp_rmem = 4096 | 131072 | 6291456 |
+
+***** Disable Auto Tuning
+#+begin_src shell
+  sudo sysctl net.ipv4.tcp_moderate_rcvbuf=0
+#+end_src
+***** BDP Calculation
+#+begin_example
+For a 100Mbps link at 10ms delay (rtt)
+BDP = 100 000 000 * .010 / 8 = 125KBytes
+#+end_example
+***** Largest MSS Multiple
+Given MSS of 1460,get the largest even multiple less than 65535
+even multiple = 65535 / 1460 = 44.9 = 44 (do not round up)
+***** Calculate the Unscaled RWIN
+After finding the MSS multiple, multiply it to the original MSS.
+
+#+begin_example
+  Given bandwidth = 100Mbps, RTT = 10ms ,MSS multiple=44, and MSS = 1460
+  Unscaled RCVWND = 44 * 1460 Bytes = 64 240 B
+#+end_example
+
+**** Perform a network throughput measurement
+***** Setup VMs
+****** *Objective:*
+Setup two virtual machines that will act as iperf client and server.
+****** *Task:*
+Using =multipass= launch a two ubuntu servers with the name *iperf-server* and *iperf-client*
+
+*** Simulate network testing
+**** Create and Launch VMs
+- Two Virtual Machines (VMs): One will act as the iperf3 server, and the other will act as the iperf3 client. Ensure they can communicate with each other.
+- Install Iperf3 on each machine.
+#+reveal: split
+#+ATTR_HTML: :style text-align: left;
+Install multipass using the =snap= package manager.
+#+begin_src shell
+  snap install multipass
+#+end_src
+#+ATTR_HTML: :style text-align: left;
+Use Multipass to create two Ubuntu VMs.
+#+begin_src shell
+  multipass launch --name iperf-server
+#+end_src
+#+begin_src shell
+  multipass launch --name iperf-client
+#+end_src
+#+ATTR_HTML: :style text-align: left;
+Enter the VMs
+#+begin_src shell
+  multipass shell [VM Name]
+#+end_src
+**** Configure the VMs
+Execute the follow commands on both VMs.
+1. Disable TCP offloading
+   #+begin_src sh
+     $ sudo ethtool -K eth0 gso off
+     $ sudo ethtool -K eth0 gro off
+     $ sudo ethtool -K eth0 tso off
+   #+end_src
+   - gso :: generic segmentation offloading
+   - gro :: generic receiver segmentation
+   - tso :: tcp segmentation offload
+2. Set the TCP congestion algorithm to New Reno
+   #+begin_src sh
+     $ sudo sysctl net.ipv4.tcp_congestion_control=reno
+   #+end_src
+3. Turn off auto tuning of buffer
+   #+begin_src sh
+     sudo sysctl net.ipv4.tcp_moderate_rcvbuf=0
+   #+end_src
+4. Simulate 5ms latency and 100mbps rate on the client
+   #+begin_src sh
+     sudo tc qdisc add dev ens3 root netem delay 5ms rate 100mbit
+   #+end_src
+   Replace ens3 with the appropriate network interface.
+5. Simulate 5ms Latency on the server
+   #+begin_src sh
+     sudo tc qdisc add dev wlp2s0 root netem delay 5ms
+   #+end_src
+**** Conduct measurements
+***** Run iperf in server mode
+We will set the window size of the iperf server from the list of values below
+#+begin_src shell
+  iperf3 -s -w <window_size_bytes>
+#+end_src
+- 50000
+- 75000
+- 83000
+- 100000
+- 125000
+
+***** Run /iperf3/ Client on the Client VM
+#+begin_src shell
+  iperf3 -c [Server_IP_Address] 
+#+end_src
+
+***** Record the data
+
+|     BW |  RTT |      BDP |       -w | rwnd     | awnd     | ethpt  | mthpt  | accu  |
+| [Mb/s] | [ms] | [KBytes] | [Kbytes] | [KBytes] | [KBytes] | [Mb/s] | [Mb/s] | ["%"] |
+|--------+------+----------+----------+----------+----------+--------+--------+-------|
+|    100 |   10 |      125 |       50 |          |          |        |        |       |
+|    100 |   10 |      125 |       75 |          |          |        |        |       |
+|    100 |   10 |      125 |       83 |          |          |        |        |       |
+|    100 |   10 |      125 |      100 |          |          |        |        |       |
+|    100 |   10 |      125 |      125 |          |          |        |        |       |
+** DONE Django Celery
+:PROPERTIES:
+:EXPORT_DATE: <2023-10-02 Mon>
+:EXPORT_FILE_NAME: Django Celery
+:END:
+Recently I was given a task to continue a Django project that show a histogram the data from the sensors we have for testing. The station sends the data in =csv= format to our server. Each scheduled measurement produces one (1) csv file with a name in the format of =name_year_month_day_hour_minutes_seconds.csv=. This files must then be parsed to store it inside a postgres database.
+
+On the django application side, a date range will then be selected to show the measurements. This takes a while to process before the data is displayed so I know that I have to do a asynchronous operation to keep the app responsive while the data if being fetch. Luckily, Django has a module to perform such operations and it's called =django-celery=. Celery is a task queue that helps manage and execute background tasks.
+
+*** Requirements
+Here are the python packages needed to build the django application.
+
+#+caption: requirements.txt
+#+begin_example
+  Django==4.2.4
+  celery==5.3.4
+  numpy==1.25.2
+  matplotlib==3.8.0
+  mpld3==0.5.9
+  django-widget-tweaks==1.5.0
+  crispy-bootstrap5==0.7
+#+end_example
+
+** DONE C/C++ Development in Emacs
+:PROPERTIES:
+:EXPORT_DATE: <2023-10-30 Mon>
+:EXPORT_FILE_NAME: Emac C/C++ Development
+:END:
+*** Introduction
+I do most of my software projects in Doom Emacs. I use python most of the time until recently when I decided to learn C and C++ again. I do have experience in both of them most specially C since I do embedded projects back at school and in some work related projects before.
+
+The features that I am looking for are code completion, syntax checking and linting.
+To get this features I need to active =lsp= and install the LSP server on the host machine. The C/C++ language mode should also be activated in Doom Emacs.
+
+*** Install LSP server
+I use *ccls* for the language server because it is the most suggested server and it works great in my experience.
+
+I installed it using my system's package manager.
+=sudo zypper install ccls=
+This should also be available on other distros (i.e. Ubuntu).
+*** Setup emacs
+1. Activate lsp and C/C++ mode in the =init.el= file at the =:tools= section.
+   #+begin_src emacs-lisp
+   (lsp)
+   #+end_src
+   and activate C/C++ languange in =:languages= section
+   #+begin_src emacs-lisp
+   (cc +lsp)
+   #+end_src
+
+2. Reload doom emacs by pressing =SPC-h r r=.
+   I am running emacs in client mode so I also restart emacs to be sure.
+   #+HUGO_SHORTCODE: highlight
+   #+begin_src shell :results raw
+   systemctl --user restart emacs
+   #+end_src
+
+
+* Articles :@Articles:
 
 ** TODO My second post                                                :hugo:
 :PROPERTIES:
@@ -73,8 +490,6 @@ When we talk about testing the network speed it is always the web browser based 
 
 Inline notation: \\(\varphi = \dfrac{1+\sqrt5}{2}= 1.6180339887…\\)
 
-
 * Projects                                                        :@Projects:
 
-** Aquarium Automatic Water Change
-
+** TODO Aquarium Automatic Water Change
