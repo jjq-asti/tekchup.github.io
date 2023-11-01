@@ -433,34 +433,128 @@ Here are the python packages needed to build the django application.
 :EXPORT_FILE_NAME: Emac C/C++ Development
 :END:
 *** Introduction
-I do most of my software projects in Doom Emacs. I use python most of the time until recently when I decided to learn C and C++ again. I do have experience in both of them most specially C since I do embedded projects back at school and in some work related projects before.
+I do most of my software projects in Doom Emacs.
+I use python most of the time until recently when I decided to learn C and C++ again for a work related project.
+I do have some experience in C since I do embedded projects back at school and in some work related projects before.
+But there are still many concepts that I haven't learned yet or already forgotten, most specially in C++.
 
 The features that I am looking for are code completion, syntax checking and linting.
-To get this features I need to active =lsp= and install the LSP server on the host machine. The C/C++ language mode should also be activated in Doom Emacs.
+To get this features I need to active =lsp= and install the LSP server on the host machine.
+The C/C++ language mode should also be activated in Doom Emacs.
 
-*** Install LSP server
-I use *ccls* for the language server because it is the most suggested server and it works great in my experience.
+*** Install the LSP server
+I use [[https://github.com/MaskRay/ccls][ccls]] for the language server because it is the most suggested server and it works great in my experience.
 
 I installed it using my system's package manager.
 =sudo zypper install ccls=
 This should also be available on other distros (i.e. Ubuntu).
+
 *** Setup emacs
-1. Activate lsp and C/C++ mode in the =init.el= file at the =:tools= section.
-   #+begin_src emacs-lisp
-   (lsp)
-   #+end_src
-   and activate C/C++ languange in =:languages= section
-   #+begin_src emacs-lisp
-   (cc +lsp)
-   #+end_src
+Activate lsp and C/C++ mode in the =init.el= file at the =:tools= section.
+#+begin_src emacs-lisp
+(lsp)
+#+end_src
+and activate C/C++ languange in =:languages= section
+#+begin_src emacs-lisp
+(cc +lsp)
+#+end_src
 
-2. Reload doom emacs by pressing =SPC-h r r=.
-   I am running emacs in client mode so I also restart emacs to be sure.
-   #+HUGO_SHORTCODE: highlight
-   #+begin_src shell :results raw
-   systemctl --user restart emacs
-   #+end_src
+Reload doom emacs by pressing =SPC-h r r=.
+I am running emacs in client mode so I also restart emacs to be sure.
+#+HUGO_SHORTCODE: highlight
+#+begin_src shell :results raw
+systemctl --user restart emacs
+#+end_src
 
+*** Testing
+To test the setup, I created a simple project in C++ and cmake.
+The project will have a function to add two numbers which will be compiled as library.
+This will then linked to the final executable.
+
+
+Create the project directories
+#+begin_src shell
+mkdir proj
+#+end_src
+
+Then create the directories inside it
+#+begin_example
+proj/src
+proj/lib
+proj/include
+#+end_example
+
+Create the function prototype.
+#+caption: include/mymath.hpp
+#+begin_src c++
+int add_numbers(int num1, int num2);
+#+end_src
+
+Implement the function for our library.
+#+caption: lib/mymath.cpp
+#+begin_src c++
+#include "mymath"
+
+int add_numbers(int num1, int num2){
+    return num1 + num2;
+}
+#+end_src
+
+Call the function in the *main.cpp*
+#+caption: src/main.cpp
+#+begin_src c++
+#include <iostream>
+#include "mymath"
+
+int main(void){
+   std::cout << add_numbers(2, 4) << std::endl;
+
+   return 0;
+}
+#+end_src
+
+Write the cmake file.
+#+caption: CMakeLists.txt
+#+begin_src cmake
+cmake_minimum_required(VERSION 3.27)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/lib)
+
+add_executable(app ${PROJECT_SOURCE_DIR}/main.cpp)
+target_link_libraries(app mymath)
+#+end_src
+
+Create another *CMakeLists.txt* in the lib directory.
+
+#+caption: lib/CMakeLists.txt
+#+begin_src cmake
+cmake_minimum_required(VERSION 2.7)
+
+add_library(mymath mymath.cpp)
+target_link_directories(mymath PRIVATE ${PROJECT_SOURCE_DIR}/include)
+#+end_src
+
+Create a *build.sh* file.
+#+caption: build.sh
+#+begin_src shell
+cmake -S . -B build
+cmake --build build
+#+end_src
+
+Make it executable with =chmod +x build.sh=
+
+We can then compile the project.
+Press =SPC c c= to run emacs compile command.
+It will then ask for the actual command for the compilation.
+We can run the command =./build.sh= or =sh build.sh=.
+If you are editing the main.cpp the command won't be able to find the *build.sh*.
+That is because the compile command is run in the directory that you are working with.
+In the case of main.cpp that is inside the *src* directory.
+To temporarily go back to the root of the project we can use the bash env command and tell it to change directory before running the command.
+
+#+begin_src shell
+env --chdir=.. ./build.sh
+#+end_src
 
 * Articles :@Articles:
 
