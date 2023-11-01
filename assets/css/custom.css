@@ -1,3 +1,4 @@
-ol pre code {
-    margin-left: -59px;
+.src-block-caption{
+    color: dimgrey;
+    font-size: medium;
 }
